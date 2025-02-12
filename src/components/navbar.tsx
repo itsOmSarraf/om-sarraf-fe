@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Navbar() {
-    const { user } = useUser();
 
     return (
         <nav className="flex items-center justify-between px-6 py-4 bg-white shadow-md dark:bg-gray-900">

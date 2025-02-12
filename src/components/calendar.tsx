@@ -211,8 +211,6 @@ export default function Calendar() {
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             isFake: false,
         };
-
-        const id = await db.slots.add(newSlot);
         await fetchAllSlots();
         toast.success("Slot added successfully!");
     };
@@ -233,7 +231,7 @@ export default function Calendar() {
 
     // Add new handlers
     const handleSlotEdit = async () => {
-        // TODO: Implement edit functionality
+        // TODO: Implement edit 
         toast.success("Edit functionality coming soon!");
     };
 
