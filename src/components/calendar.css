@@ -1,0 +1,95 @@
+/* Calendar container */
+.fc {
+	--fc-border-color: #e5e7eb;
+	--fc-page-bg-color: transparent;
+}
+
+.dark .fc {
+	--fc-border-color: #374151;
+	--fc-page-bg-color: transparent;
+	--fc-neutral-bg-color: #1f2937;
+	color: #e5e7eb;
+}
+
+/* Headers and text */
+.dark .fc th {
+	color: #e5e7eb;
+	border-color: #374151;
+}
+
+.dark .fc-toolbar-title {
+	color: #e5e7eb;
+}
+
+/* Time slots */
+.dark .fc-timegrid-slot {
+	border-color: #374151;
+}
+
+.dark .fc-timegrid-slot-lane {
+	background: #111827;
+}
+
+/* Today highlight */
+.dark .fc .fc-day-today {
+	background: #1f2937 !important;
+}
+
+/* Event styles */
+.fc-event {
+	border-radius: 4px;
+	padding: 2px 4px;
+	font-size: 0.875rem;
+}
+
+.my-slot {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.other-slot {
+	opacity: 0.9;
+	transition: opacity 0.2s;
+}
+
+.other-slot:hover {
+	opacity: 1;
+}
+
+/* Buttons */
+.dark .fc-button {
+	background: #374151 !important;
+	border-color: #4b5563 !important;
+	color: #e5e7eb !important;
+}
+
+.dark .fc-button:hover {
+	background: #4b5563 !important;
+}
+
+.dark .fc-button-active {
+	background: #6b7280 !important;
+}
+
+/* Time grid lines */
+.dark .fc-timegrid-col {
+	border-color: #374151;
+}
+
+.dark .fc-timegrid-axis {
+	border-color: #374151;
+}
+
+/* Week numbers */
+.dark .fc-day-header {
+	background: #1f2937;
+}
+
+/* Now indicator */
+.dark .fc-timegrid-now-indicator-line {
+	border-color: #ef4444;
+}
+
+.dark .fc-timegrid-now-indicator-arrow {
+	border-color: #ef4444;
+	color: #ef4444;
+}
