@@ -259,11 +259,7 @@ export default function Calendar() {
         }
     };
 
-    // Add a temporary debug button
-    const debugDatabase = async () => {
-        const allSlots = await db.slots.toArray();
-        console.log("All slots in database:", allSlots);
-    };
+
 
     return (
         <div className="p-2 sm:p-6 bg-white rounded-lg shadow-md dark:bg-gray-900">
@@ -315,10 +311,7 @@ export default function Calendar() {
                 <Button onClick={handleClearSlots} variant="destructive" className="text-sm sm:text-base">
                     Clear My Slots
                 </Button>
-                {/* Temporary debug buttons */}
-                <Button onClick={debugDatabase} variant="outline" className="text-sm sm:text-base">
-                    Debug DB
-                </Button>
+
                 <Button onClick={resetDatabase} variant="outline" className="text-sm sm:text-base">
                     Reset DB
                 </Button>
