@@ -1,31 +1,98 @@
-<!-- DO NOT REMOVE EXISTING CONTENTS OF THIS FILE, EVEN IN YOUR REPOSITORY -->
+# Slot Booking Application
 
-# Frontend assignment repository template
+A modern slot booking application built with Next.js, featuring real-time availability management and a sleek user interface. This project was created as part of the Zelthy Frontend Internship Assignment.
 
-This is a template repository for submitting assignment for the Frontend developer internship at Zelthy. All those who are submitting the frontend assignment must use this template.
+## Features
 
-Assignment link: https://zelthy.com/assignments/frontend-intern
+- 📅 Interactive calendar interface with day, week, and month views
+- 🔐 Secure authentication using Clerk
+- 💾 Local data persistence with IndexedDB
+- 🌓 Dark/Light mode support
+- 📱 Responsive design for all devices
+- 🤖 Simulated user bookings for demo purposes
+- ⚡ Real-time slot management
+- 🎨 Modern UI with Tailwind CSS and shadcn/ui
 
-Submission form: https://forms.gle/o8tUdshRWS33tg8X6
+## Tech Stack
 
-### How to use this template?
+- **Framework**: Next.js 14
+- **Authentication**: Clerk
+- **Database**: IndexedDB (via Dexie.js)
+- **UI Components**: shadcn/ui
+- **Styling**: Tailwind CSS
+- **Calendar**: FullCalendar
+- **State Management**: React Hooks
+- **Date Handling**: date-fns
+- **Notifications**: react-hot-toast
 
-1. If you are reading this on GitHub, click the "use this template" dropdown in the top right corner of the page and select "Create a new repository".
-   <img width="1470" alt="Screenshot 2025-02-07 at 6 10 26 PM" src="https://github.com/user-attachments/assets/360f44ae-57e8-4c47-b768-cbfd95b3aa0a" />
+## Getting Started
 
-2. Next you will be redirected to create a new repository page on GitHub with this repository as a template. Fill the repository name and description and click "Create repository".
-   <img width="1470" alt="Screenshot 2025-02-07 at 3 09 25 PM" src="https://github.com/user-attachments/assets/17bd7a00-99fb-4ff6-8003-4b96506189f3" />
+### Prerequisites
 
-3. And thats it! A new repository using this template has been created for you!
+- Node.js 18+
+- npm or yarn
 
-### How to submit the assignment?
+### Installation
 
-1. Clone the repository that you created using the instructions above.
+1. Clone the repository:
 
-2. Add and commit your changes to that repository.
+git clone https://github.com/yourusername/slot-booking-app.git
+cd slot-booking-app
 
-3. Push the changes to github.
+2. Install dependencies:
 
-4. Go to the submission form and fill the details and submit the assignment.
+```bash
+npm install
+# or
+yarn install
+```
 
-## Happy coding!
+3. Create a `.env.local` file in the root directory and add your Clerk credentials:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
+CLERK_SECRET_KEY=your_secret_key
+```
+
+4. Start the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Usage
+
+1. Sign in using the authentication system
+2. Navigate to the calendar view
+3. Click on any time slot to create a booking
+4. View, edit, or delete your bookings
+5. See other users' availability in different colors
+6. Toggle between dark and light modes
+
+## Project Structure
+
+```
+src/
+├── app/                  # Next.js app directory
+├── components/          # Reusable UI components
+├── lib/                 # Utilities and database setup
+│   ├── constants/      # Application constants
+│   ├── db.ts           # IndexedDB configuration
+│   └── utils.ts        # Helper functions
+└── styles/             # Global styles and CSS modules
+```
+
+## Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- UI components from [shadcn/ui](https://ui.shadcn.com/)
+- Calendar functionality by [FullCalendar](https://fullcalendar.io/)
+- Authentication by [Clerk](https://clerk.dev/)
+
+---
+
+Created by [Om Sarraf](https://itsomsarraf.com) - Feel free to connect!
