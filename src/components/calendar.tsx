@@ -21,6 +21,9 @@ import {
     PROBABILITY
 } from "@/lib/constants/calendar";
 
+// Add new types at the top of the file
+type RepeatOption = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 export default function Calendar() {
     const { user } = useUser();
     const [events, setEvents] = useState<EventInput[]>([]);
@@ -28,6 +31,9 @@ export default function Calendar() {
     const [isInitialized, setIsInitialized] = useState(false);
     const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [repeatOption, setRepeatOption] = useState<RepeatOption>('none');
+    const [repeatUntil, setRepeatUntil] = useState<Date | null>(null);
 
     // Get consistent color for a user
     const getUserColor = (userId: string) => {
@@ -237,10 +243,131 @@ export default function Calendar() {
         }
     };
 
-    // Add new handlers
-    const handleSlotEdit = async () => {
-        // TODO: Implement edit 
-        toast.success("Edit functionality coming soon!");
+    // Update the handleSlotEdit function
+    const handleSlotEdit = async (
+        repeatOption: RepeatOption = 'none',
+        repeatUntil: Date | null = null,
+        newDate?: string,
+        newStartTime?: string,
+        newEndTime?: string
+    ) => {
+        if (!user || !selectedSlot) return;
+
+        if (selectedSlot.userId !== user.id) {
+            toast.error("You can only edit your own slots!");
+            return;
+        }
+
+        try {
+            const event = events.find(e => e.id === String(selectedSlot.id));
+            if (!event) return;
+
+            // Use provided new values or get them from the event
+            const startDateTime = new Date(event.start as string);
+            const endDateTime = new Date(event.end as string);
+
+            const newSlotDate = newDate || startDateTime.toISOString().split("T")[0];
+            const newSlotStart = newStartTime || startDateTime.toTimeString().substring(0, 5);
+            const newSlotEnd = newEndTime || endDateTime.toTimeString().substring(0, 5);
+
+            // Generate repeated slots if a repeat option is selected
+            const slotsToAdd = [];
+            if (repeatOption !== 'none' && repeatUntil) {
+                let currentDate = new Date(startDateTime);
+
+                while (currentDate <= repeatUntil) {
+                    const slotDate = currentDate.toISOString().split("T")[0];
+
+                    // Skip the original slot date
+                    if (slotDate !== newSlotDate) {
+                        slotsToAdd.push({
+                            userId: user.id,
+                            userName: user.fullName || 'User',
+                            date: slotDate,
+                            startTime: newSlotStart,
+                            endTime: newSlotEnd,
+                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            isFake: false,
+                        });
+                    }
+
+                    // Increment date based on repeat option
+                    switch (repeatOption) {
+                        case 'daily':
+                            currentDate.setDate(currentDate.getDate() + 1);
+                            break;
+                        case 'weekly':
+                            currentDate.setDate(currentDate.getDate() + 7);
+                            break;
+                        case 'monthly':
+                            currentDate.setMonth(currentDate.getMonth() + 1);
+                            break;
+                        case 'yearly':
+                            currentDate.setFullYear(currentDate.getFullYear() + 1);
+                            break;
+                    }
+                }
+            }
+
+            // Check for overlapping slots including repeated slots
+            const allDates = [newSlotDate, ...slotsToAdd.map(slot => slot.date)];
+            const existingSlots = await db.slots
+                .where("userId")
+                .equals(user.id)
+                .and(slot => {
+                    return slot.id !== selectedSlot.id && // Exclude the current slot
+                        allDates.includes(slot.date) &&
+                        !((slot.endTime <= newSlotStart) || (slot.startTime >= newSlotEnd));
+                })
+                .toArray();
+
+            if (existingSlots.length > 0) {
+                toast.error("Some slots overlap with your existing slots!");
+                await fetchAllSlots();
+                return;
+            }
+
+            // Update the original slot
+            await db.slots.update(selectedSlot.id!, {
+                date: newSlotDate,
+                startTime: newSlotStart,
+                endTime: newSlotEnd
+            });
+
+            // Add repeated slots
+            if (slotsToAdd.length > 0) {
+                await db.slots.bulkAdd(slotsToAdd);
+            }
+
+            await fetchAllSlots();
+            setIsDialogOpen(false);
+            setEditMode(false);
+            setRepeatOption('none');
+            setRepeatUntil(null);
+            toast.success("Slot(s) updated successfully!");
+        } catch (error) {
+            console.error("Error updating slot:", error);
+            toast.error("Failed to update slot");
+            await fetchAllSlots();
+        }
+    };
+
+    // Add eventChange handler to FullCalendar component
+    const handleEventChange = async (changeInfo: any) => {
+        if (!user) return;
+
+        const slotId = Number(changeInfo.event.id);
+        const slot = await db.slots.get(slotId);
+
+        if (!slot || slot.userId !== user.id) {
+            toast.error("You can only edit your own slots!");
+            await fetchAllSlots(); // Reset the calendar view
+            return;
+        }
+
+        setSelectedSlot(slot);
+        // Trigger the edit handler
+        await handleSlotEdit();
     };
 
     const handleSlotBook = async () => {
@@ -259,8 +386,6 @@ export default function Calendar() {
         }
     };
 
-
-
     return (
         <div className="p-2 sm:p-6 bg-white rounded-lg shadow-md dark:bg-gray-900">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800 dark:text-white">Manage Your Availability</h2>
@@ -274,6 +399,7 @@ export default function Calendar() {
                 events={events}
                 select={handleSlotAdd}
                 eventClick={handleEventClick}
+                eventChange={handleEventChange}
                 headerToolbar={{
                     left: windowWidth < 640 ? 'prev,next' : 'prev,next today',
                     center: 'title',
@@ -300,12 +426,23 @@ export default function Calendar() {
             />
             <SlotDetailsDialog
                 isOpen={isDialogOpen}
-                onClose={() => setIsDialogOpen(false)}
+                onClose={() => {
+                    setIsDialogOpen(false);
+                    setEditMode(false);
+                    setRepeatOption('none');
+                    setRepeatUntil(null);
+                }}
                 slot={selectedSlot}
                 isOwnSlot={selectedSlot?.userId === user?.id}
                 onDelete={handleSlotDelete}
                 onBook={handleSlotBook}
                 onEdit={handleSlotEdit}
+                editMode={editMode}
+                setEditMode={setEditMode}
+                repeatOption={repeatOption}
+                setRepeatOption={setRepeatOption}
+                repeatUntil={repeatUntil}
+                setRepeatUntil={setRepeatUntil}
             />
             <div className="mt-4 flex justify-center gap-2">
                 <Button onClick={handleClearSlots} variant="destructive" className="text-sm sm:text-base">
