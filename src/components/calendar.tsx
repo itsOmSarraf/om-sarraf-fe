@@ -21,9 +21,22 @@ import {
     PROBABILITY
 } from "@/lib/constants/calendar";
 import { CopyDayDialog } from "@/components/copy-day-dialog";
+import { Select } from "@/components/ui/select";
+import {
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 // Add new types at the top of the file
 type RepeatOption = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+// Add this type definition near other types
+type TimezoneOption = {
+    value: string;
+    label: string;
+};
 
 export default function Calendar() {
     const { user } = useUser();
@@ -38,6 +51,8 @@ export default function Calendar() {
     const [repeatUntil, setRepeatUntil] = useState<Date | null>(null);
     const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [currentTimezone, setCurrentTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const [timezoneOptions, setTimezoneOptions] = useState<TimezoneOption[]>([]);
 
     // Get consistent color for a user
     const getUserColor = (userId: string) => {
@@ -134,29 +149,54 @@ export default function Calendar() {
         }
     };
 
-    // Update fetchAllSlots to use constants
+    // Add this useEffect to initialize timezone options
+    useEffect(() => {
+        // Get all timezone names
+        const timezonesRaw = Intl.supportedValuesOf('timeZone');
+        const options = timezonesRaw.map(tz => ({
+            value: tz,
+            label: tz.replace(/_/g, ' ')
+        }));
+        setTimezoneOptions(options);
+    }, []);
+
+    // Modify the fetchAllSlots function to handle timezone conversion
     const fetchAllSlots = async () => {
         if (!user) return;
         try {
             const allSlots = await db.slots.toArray();
 
             setEvents(
-                allSlots.map((slot) => ({
-                    id: String(slot.id),
-                    title: slot.userId === user.id ? "Your Slot" : `Available: ${slot.userName}`,
-                    start: `${slot.date}T${slot.startTime}`,
-                    end: `${slot.date}T${slot.endTime}`,
-                    allDay: false,
-                    backgroundColor: slot.userId === user.id
-                        ? CALENDAR_COLORS.ownSlot.background
-                        : getUserColor(slot.userId),
-                    borderColor: slot.userId === user.id
-                        ? CALENDAR_COLORS.ownSlot.border
-                        : getUserBorderColor(slot.userId),
-                    textColor: CALENDAR_COLORS.text,
-                    editable: slot.userId === user.id,
-                    classNames: slot.userId === user.id ? ['my-slot'] : ['other-slot'],
-                }))
+                allSlots.map((slot) => {
+                    // Convert the slot times from their original timezone to the selected timezone
+                    const startDate = new Date(`${slot.date}T${slot.startTime}`);
+                    const endDate = new Date(`${slot.date}T${slot.endTime}`);
+
+                    // Create Date objects in the original timezone
+                    const originalStart = new Date(startDate.toLocaleString('en-US', { timeZone: slot.timezone }));
+                    const originalEnd = new Date(endDate.toLocaleString('en-US', { timeZone: slot.timezone }));
+
+                    // Convert to the current selected timezone
+                    const convertedStart = new Date(originalStart.toLocaleString('en-US', { timeZone: currentTimezone }));
+                    const convertedEnd = new Date(originalEnd.toLocaleString('en-US', { timeZone: currentTimezone }));
+
+                    return {
+                        id: String(slot.id),
+                        title: slot.userId === user.id ? "Your Slot" : `Available: ${slot.userName}`,
+                        start: convertedStart,
+                        end: convertedEnd,
+                        allDay: false,
+                        backgroundColor: slot.userId === user.id
+                            ? CALENDAR_COLORS.ownSlot.background
+                            : getUserColor(slot.userId),
+                        borderColor: slot.userId === user.id
+                            ? CALENDAR_COLORS.ownSlot.border
+                            : getUserBorderColor(slot.userId),
+                        textColor: CALENDAR_COLORS.text,
+                        editable: slot.userId === user.id,
+                        classNames: slot.userId === user.id ? ['my-slot'] : ['other-slot'],
+                    };
+                })
             );
         } catch (error) {
             console.error("Error in fetchAllSlots:", error);
@@ -187,6 +227,13 @@ export default function Calendar() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    // Add timezone change handler
+    const handleTimezoneChange = (newTimezone: string) => {
+        setCurrentTimezone(newTimezone);
+        // Refetch and convert slots when timezone changes
+        fetchAllSlots();
+    };
+
     // Handle new slot creation
     const handleSlotAdd = async (selectionInfo: any) => {
         if (!user) return;
@@ -195,6 +242,17 @@ export default function Calendar() {
             const newSlotDate = selectionInfo.startStr.split("T")[0];
             const newSlotStart = selectionInfo.startStr.split("T")[1].substring(0, 5);
             const newSlotEnd = selectionInfo.endStr.split("T")[1].substring(0, 5);
+
+            // Store the slot in the current timezone
+            const newSlot = {
+                userId: user.id,
+                userName: user.fullName || 'User',
+                date: newSlotDate,
+                startTime: newSlotStart,
+                endTime: newSlotEnd,
+                timezone: currentTimezone, // Use current timezone
+                isFake: false,
+            };
 
             // Check for existing slots by the same user that overlap with the new slot
             const existingSlots = await db.slots
@@ -210,16 +268,6 @@ export default function Calendar() {
                 toast.error("You already have a slot during this time period!");
                 return;
             }
-
-            const newSlot = {
-                userId: user.id,
-                userName: user.fullName || 'User',
-                date: newSlotDate,
-                startTime: newSlotStart,
-                endTime: newSlotEnd,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                isFake: false,
-            };
 
             // Add the new slot to the database
             await db.slots.add(newSlot);
@@ -384,7 +432,26 @@ export default function Calendar() {
 
     return (
         <div className="p-2 sm:p-6 bg-white rounded-lg shadow-md dark:bg-gray-900">
-            <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800 dark:text-white">Manage Your Availability</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">
+                    Manage Your Availability
+                </h2>
+                <Select
+                    value={currentTimezone}
+                    onValueChange={handleTimezoneChange}
+                >
+                    <SelectTrigger className="w-[280px]">
+                        <SelectValue placeholder="Select Timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {timezoneOptions.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
             <FullCalendar
                 ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
