@@ -218,7 +218,7 @@ export default function Calendar() {
         };
 
         initializeCalendar();
-    }, [user, isInitialized]);
+    }, [user, isInitialized, generateFakeSlots]); // Added generateFakeSlots to dependency array
 
     // Add window resize listener
     useEffect(() => {

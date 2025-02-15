@@ -50,14 +50,10 @@ export function SlotDetailsDialog({
     repeatUntil,
     setRepeatUntil
 }: SlotDetailsDialogProps) {
-    if (!slot) return null;
-
-    const formattedDate = format(new Date(slot.date), 'MMMM do, yyyy');
-
-    // Add state for time/date editing
-    const [editDate, setEditDate] = useState(slot.date);
-    const [editStartTime, setEditStartTime] = useState(slot.startTime);
-    const [editEndTime, setEditEndTime] = useState(slot.endTime);
+    // Move state declarations before any conditional returns
+    const [editDate, setEditDate] = useState("");
+    const [editStartTime, setEditStartTime] = useState("");
+    const [editEndTime, setEditEndTime] = useState("");
 
     // Reset edit values when dialog opens/closes
     useEffect(() => {
@@ -67,6 +63,10 @@ export function SlotDetailsDialog({
             setEditEndTime(slot.endTime);
         }
     }, [isOpen, slot]);
+
+    if (!slot) return null;
+
+    const formattedDate = format(new Date(slot.date), 'MMMM do, yyyy');
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -216,4 +216,4 @@ export function SlotDetailsDialog({
             </DialogContent>
         </Dialog>
     );
-} 
+}
