@@ -12,6 +12,11 @@ A modern slot booking application built with Next.js, featuring real-time availa
 - 🤖 Simulated user bookings for demo purposes
 - ⚡ Real-time slot management
 - 🎨 Modern UI with Tailwind CSS and shadcn/ui
+- 📋 Copy slots from one day to another
+- ⏰ Custom time picker for precise slot scheduling
+- 🔄 Bulk slot management capabilities
+- 📊 Enhanced slot details view with additional information
+- 🎯 Quick slot navigation and management
 
 ## Tech Stack
 
