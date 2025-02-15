@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -20,12 +20,14 @@ import {
     CALENDAR_SETTINGS,
     PROBABILITY
 } from "@/lib/constants/calendar";
+import { CopyDayDialog } from "@/components/copy-day-dialog";
 
 // Add new types at the top of the file
 type RepeatOption = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export default function Calendar() {
     const { user } = useUser();
+    const calendarRef = useRef<any>(null);
     const [events, setEvents] = useState<EventInput[]>([]);
     const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
     const [isInitialized, setIsInitialized] = useState(false);
@@ -34,6 +36,8 @@ export default function Calendar() {
     const [editMode, setEditMode] = useState(false);
     const [repeatOption, setRepeatOption] = useState<RepeatOption>('none');
     const [repeatUntil, setRepeatUntil] = useState<Date | null>(null);
+    const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
     // Get consistent color for a user
     const getUserColor = (userId: string) => {
@@ -262,89 +266,16 @@ export default function Calendar() {
             const event = events.find(e => e.id === String(selectedSlot.id));
             if (!event) return;
 
-            // Use provided new values or get them from the event
-            const startDateTime = new Date(event.start as string);
-            const endDateTime = new Date(event.end as string);
-
-            const newSlotDate = newDate || startDateTime.toISOString().split("T")[0];
-            const newSlotStart = newStartTime || startDateTime.toTimeString().substring(0, 5);
-            const newSlotEnd = newEndTime || endDateTime.toTimeString().substring(0, 5);
-
-            // Generate repeated slots if a repeat option is selected
-            const slotsToAdd = [];
-            if (repeatOption !== 'none' && repeatUntil) {
-                let currentDate = new Date(startDateTime);
-
-                while (currentDate <= repeatUntil) {
-                    const slotDate = currentDate.toISOString().split("T")[0];
-
-                    // Skip the original slot date
-                    if (slotDate !== newSlotDate) {
-                        slotsToAdd.push({
-                            userId: user.id,
-                            userName: user.fullName || 'User',
-                            date: slotDate,
-                            startTime: newSlotStart,
-                            endTime: newSlotEnd,
-                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            isFake: false,
-                        });
-                    }
-
-                    // Increment date based on repeat option
-                    switch (repeatOption) {
-                        case 'daily':
-                            currentDate.setDate(currentDate.getDate() + 1);
-                            break;
-                        case 'weekly':
-                            currentDate.setDate(currentDate.getDate() + 7);
-                            break;
-                        case 'monthly':
-                            currentDate.setMonth(currentDate.getMonth() + 1);
-                            break;
-                        case 'yearly':
-                            currentDate.setFullYear(currentDate.getFullYear() + 1);
-                            break;
-                    }
-                }
-            }
-
-            // Check for overlapping slots including repeated slots
-            const allDates = [newSlotDate, ...slotsToAdd.map(slot => slot.date)];
-            const existingSlots = await db.slots
-                .where("userId")
-                .equals(user.id)
-                .and(slot => {
-                    return slot.id !== selectedSlot.id && // Exclude the current slot
-                        allDates.includes(slot.date) &&
-                        !((slot.endTime <= newSlotStart) || (slot.startTime >= newSlotEnd));
-                })
-                .toArray();
-
-            if (existingSlots.length > 0) {
-                toast.error("Some slots overlap with your existing slots!");
-                await fetchAllSlots();
-                return;
-            }
-
-            // Update the original slot
             await db.slots.update(selectedSlot.id!, {
-                date: newSlotDate,
-                startTime: newSlotStart,
-                endTime: newSlotEnd
+                date: newDate || event.start?.toString().split('T')[0],
+                startTime: newStartTime || event.start?.toString().split('T')[1].substring(0, 5),
+                endTime: newEndTime || event.end?.toString().split('T')[1].substring(0, 5)
             });
-
-            // Add repeated slots
-            if (slotsToAdd.length > 0) {
-                await db.slots.bulkAdd(slotsToAdd);
-            }
 
             await fetchAllSlots();
             setIsDialogOpen(false);
             setEditMode(false);
-            setRepeatOption('none');
-            setRepeatUntil(null);
-            toast.success("Slot(s) updated successfully!");
+            toast.success("Slot updated successfully!");
         } catch (error) {
             console.error("Error updating slot:", error);
             toast.error("Failed to update slot");
@@ -386,12 +317,78 @@ export default function Calendar() {
         }
     };
 
+    // Replace the entire handleCopyDay function with this corrected version
+    const handleCopyDay = async (date: Date) => {
+        if (!user) return;
+
+        try {
+            // Helper function to format time with timezone consideration
+            const formatTime = (time: string, timezone: string) => {
+                // Create a date object with the slot's date and time
+                const [hours, minutes] = time.split(':');
+                const slotDate = new Date(date);
+                slotDate.setHours(parseInt(hours), parseInt(minutes));
+
+                // Format the time in the slot's timezone
+                return new Intl.DateTimeFormat('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: timezone
+                }).format(slotDate);
+            };
+
+            const selectedDateStr = date.toISOString().split('T')[0];
+
+            // Query slots for the selected date AND current user only
+            const slots = await db.slots
+                .where('date')
+                .equals(selectedDateStr)
+                .and(slot => slot.userId === user.id)
+                .toArray();
+
+            // Format the date in user's timezone
+            const formattedDate = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            if (slots.length === 0) {
+                toast.error(`No availability found for ${formattedDate}`);
+                return;
+            }
+
+            // Get user's timezone
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+            // Sort slots by start time and format the message
+            const message = slots
+                .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                .map(slot => `${formatTime(slot.startTime, slot.timezone)} - ${formatTime(slot.endTime, slot.timezone)}`)
+                .join('\n');
+
+            const fullMessage = `My availability for ${formattedDate}:\n${message}\nTimezone: ${userTimezone}`;
+
+            // Copy to clipboard
+            await navigator.clipboard.writeText(fullMessage);
+
+            console.log(fullMessage);
+            toast.success('Your availability has been copied to clipboard!');
+
+        } catch (error) {
+            console.error('Error fetching slots:', error);
+            toast.error('Failed to copy availability');
+        }
+    };
+
     return (
         <div className="p-2 sm:p-6 bg-white rounded-lg shadow-md dark:bg-gray-900">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 text-gray-800 dark:text-white">Manage Your Availability</h2>
             <FullCalendar
+                ref={calendarRef}
                 plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                initialView={windowWidth < CALENDAR_SETTINGS.viewBreakpoints.mobile ? "timeGridDay" : "timeGridWeek"}
+                initialView="timeGridDay"
                 editable={true}
                 selectable={true}
                 selectOverlap={true}
@@ -404,10 +401,10 @@ export default function Calendar() {
                     left: windowWidth < 640 ? 'prev,next' : 'prev,next today',
                     center: 'title',
                     right: windowWidth < 640
-                        ? 'timeGridDay'
+                        ? 'timeGridDay copyDay'
                         : windowWidth < CALENDAR_SETTINGS.viewBreakpoints.tablet
-                            ? 'timeGridDay,timeGridWeek'
-                            : 'dayGridMonth,timeGridWeek,timeGridDay'
+                            ? 'timeGridDay,timeGridWeek copyDay'
+                            : 'timeGridDay,timeGridWeek,dayGridMonth copyDay'
                 }}
                 height="auto"
                 stickyHeaderDates={true}
@@ -423,6 +420,18 @@ export default function Calendar() {
                 }}
                 slotMinTime={CALENDAR_SETTINGS.slotMinTime}
                 slotMaxTime={CALENDAR_SETTINGS.slotMaxTime}
+                customButtons={{
+                    copyDay: {
+                        text: 'Copy Day',
+                        click: () => {
+                            if (calendarRef.current) {
+                                const calendarApi = calendarRef.current.getApi();
+                                setSelectedDate(calendarApi.getDate());
+                                setIsCopyDialogOpen(true);
+                            }
+                        }
+                    }
+                }}
             />
             <SlotDetailsDialog
                 isOpen={isDialogOpen}
@@ -443,6 +452,12 @@ export default function Calendar() {
                 setRepeatOption={setRepeatOption}
                 repeatUntil={repeatUntil}
                 setRepeatUntil={setRepeatUntil}
+            />
+            <CopyDayDialog
+                isOpen={isCopyDialogOpen}
+                onClose={() => setIsCopyDialogOpen(false)}
+                sourceDate={selectedDate}
+                onCopy={handleCopyDay}
             />
             <div className="mt-4 flex justify-center gap-2">
                 <Button onClick={handleClearSlots} variant="destructive" className="text-sm sm:text-base">
