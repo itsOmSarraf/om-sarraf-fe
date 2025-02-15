@@ -370,62 +370,66 @@ export default function Calendar() {
         if (!user) return;
 
         try {
-            // Helper function to format time with timezone consideration
-            const formatTime = (time: string, timezone: string) => {
-                // Create a date object with the slot's date and time
-                const [hours, minutes] = time.split(':');
-                const slotDate = new Date(date);
-                slotDate.setHours(parseInt(hours), parseInt(minutes));
+            // Get the selected date from the calendar API to ensure correct date
+            const calendarApi = calendarRef.current.getApi();
+            const selectedDate = calendarApi.getDate();
+            const selectedDateStr = selectedDate.toISOString().split('T')[0];
 
-                // Format the time in the slot's timezone
-                return new Intl.DateTimeFormat('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                    timeZone: timezone
-                }).format(slotDate);
-            };
+            // Find events for the selected date from the events state
+            const todaysEvents = events.filter(event => {
+                const eventDate = new Date(event.start as Date);
+                return eventDate.toISOString().split('T')[0] === selectedDateStr &&
+                    event.title === "Your Slot"; // Only get the user's own slots
+            });
 
-            const selectedDateStr = date.toISOString().split('T')[0];
+            if (todaysEvents.length === 0) {
+                toast.error("You don't have any availability set for this day");
+                return;
+            }
 
-            // Query slots for the selected date AND current user only
-            const slots = await db.slots
-                .where('date')
-                .equals(selectedDateStr)
-                .and(slot => slot.userId === user.id)
-                .toArray();
-
-            // Format the date in user's timezone
-            const formattedDate = date.toLocaleDateString('en-US', {
+            // Format the date
+            const formattedDate = selectedDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric'
             });
 
-            if (slots.length === 0) {
-                toast.error(`No availability found for ${formattedDate}`);
-                return;
-            }
+            // Format the slots
+            const formattedSlots = todaysEvents
+                .sort((a, b) => {
+                    const aStart = new Date(a.start as Date);
+                    const bStart = new Date(b.start as Date);
+                    return aStart.getTime() - bStart.getTime();
+                })
+                .map(event => {
+                    const start = new Date(event.start as Date);
+                    const end = new Date(event.end as Date);
 
-            // Get user's timezone
-            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    return {
+                        start: start.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                            timeZone: currentTimezone
+                        }),
+                        end: end.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                            timeZone: currentTimezone
+                        })
+                    };
+                });
 
-            // Sort slots by start time and format the message
-            const message = slots
-                .sort((a, b) => a.startTime.localeCompare(b.startTime))
-                .map(slot => `${formatTime(slot.startTime, slot.timezone)} - ${formatTime(slot.endTime, slot.timezone)}`)
-                .join('\n');
+            const message = `My availability for ${formattedDate}:\n` +
+                formattedSlots.map(slot => `${slot.start} - ${slot.end}`).join('\n') +
+                `\nTimezone: ${currentTimezone}`;
 
-            const fullMessage = `My availability for ${formattedDate}:\n${message}\nTimezone: ${userTimezone}`;
-
-            // Copy to clipboard
-            await navigator.clipboard.writeText(fullMessage);
-
-            console.log(fullMessage);
+            await navigator.clipboard.writeText(message);
             toast.success('Your availability has been copied to clipboard!');
 
         } catch (error) {
-            console.error('Error fetching slots:', error);
+            console.error('Error copying availability:', error);
             toast.error('Failed to copy availability');
         }
     };
